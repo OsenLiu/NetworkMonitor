@@ -19,11 +19,21 @@ def find_process_pid(process_name):
             return proc.pid
     return None
 
+def find_process_name(pid):
+    """Find process name for the given PID."""
+    for proc in psutil.process_iter(['pid', 'name']):
+        if proc.info['pid'] == pid:
+            return proc.info['name']
+    return None
+
 def monitor_network(process_name):
     # Use netstat to find connections, filtering by the process name
     # Note: This does not directly correlate to PID due to netstat's limitations
     while True:
         pid = find_process_pid(process_name)
+        if pid is None:
+            print(f"Process '{process_name}' not found.")
+            return
         result = subprocess.run(['netstat', '-aon'], capture_output=True, text=True)
         lines = result.stdout.split('\n')
         for line in lines:
@@ -46,7 +56,37 @@ def monitor_network(process_name):
                 
         time.sleep(1)
     
+def get_listen_port(process_name):
+    """Find the port the process is listening on."""
+    pid = find_process_pid(process_name)
+    if pid is None:
+        print(f"Process '{process_name}' not found.")
+        return
+    result = subprocess.run(['netstat', '-aon'], capture_output=True, text=True)
+    lines = result.stdout.split('\n')
+    for line in lines:
+        if str(pid) in line and 'LISTENING' in line:
+            parts = line.split()
+            if len(parts) > 1:
+                return parts[1].split(':')[-1]
+    return None
 
-# Example usage
-process_name = 'clickshare'  # Replace with your process name
-monitor_network(process_name)
+def list_listen_port():
+    result = subprocess.run(['netstat', '-aon'], capture_output=True, text=True)
+    lines = result.stdout.split('\n')
+    for line in lines:
+        if 'LISTENING' in line:
+            parts = line.split()
+            if len(parts) > 1:
+                pid = parts[1].split(':')[-1]
+                process_name = find_process_name(pid)
+                print(f"PID: {pid}, Process Name: {process_name}")
+        
+        
+
+# get_listen_port("ClickShare Web Component")
+list_listen_port()
+
+# process_name = 'clickshare'  # Replace with your process name
+# monitor_network(process_name)
+
